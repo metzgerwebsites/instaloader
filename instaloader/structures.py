@@ -259,6 +259,16 @@ class Post:
         return fake_node
 
     @staticmethod
+    def _from_clips_node(context: 'InstaloaderContext', node: Dict[str, Any]) -> 'Post':
+        """Post for a reels-tab node. Keeps the node's play_count, which the shortcode query often omits
+        and the clips fallback only finds on the first page."""
+        post = Post.from_shortcode(context=context, shortcode=node["media"]["code"])
+        play_count = node["media"].get("play_count")
+        if play_count is not None and post._node.get("video_play_count") is None:
+            post._node["video_play_count"] = play_count
+        return post
+
+    @staticmethod
     def _fetch_play_count_from_clips(context: 'InstaloaderContext', user_id: str,
                                      shortcode: str) -> Optional[int]:
         """Fetch play_count for a reel via the clips connection endpoint as a fallback."""
@@ -1522,7 +1532,7 @@ class Profile:
             edge_extractor = lambda d: d['data']['fetch__XDTUserDict']['clips_connection'],
             # Reels post info is incomplete relative to regular posts so we create a Post from the shortcode
             # and fetch the additional metadata with an additional API request per Reel
-            node_wrapper = lambda n: Post.from_shortcode(context=self._context, shortcode=n["media"]["code"]),
+            node_wrapper = lambda n: Post._from_clips_node(self._context, n),
             query_variables = {
                 'data': {'page_size': 12, 'include_feed_video': True, "target_user_id": str(self.userid)},
                 'id': str(self.userid),
